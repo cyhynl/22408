@@ -17,12 +17,78 @@ async function checkMySQL() {
         if (data.db === 'mysql') {
             useMySQL = true;
             console.log('✅ MySQL 后端已连接');
+            // 自动迁移：如果 MySQL 为空但 localStorage 有数据，自动导入
+            await autoMigrateToMySQL();
             return true;
         }
     } catch (e) {
         console.log('ℹ️ 未检测到 MySQL 后端，使用浏览器存储');
     }
     return false;
+}
+
+// 自动将 localStorage/IndexedDB 中的旧数据迁移到 MySQL
+async function autoMigrateToMySQL() {
+    let hasLocalData = false;
+    for (const p of PROJECTS) {
+        const local = loadRawDataLocal(p.storageKey);
+        if (local.length > 0) { hasLocalData = true; break; }
+    }
+    if (!hasLocalData) return; // localStorage 无数据，无需迁移
+
+    // 检查 MySQL 是否已有数据
+    try {
+        const resp = await fetch(API_BASE + '/api/items/' + PROJECTS[0].storageKey);
+        const items = await resp.json();
+        if (items.length > 0) return; // MySQL 已有数据，跳过迁移
+    } catch (e) { return; }
+
+    // 有 localStorage 数据但 MySQL 为空 → 迁移
+    console.log('🔄 检测到浏览器旧数据，正在迁移到 MySQL...');
+    showToast('🔄 正在将浏览器数据迁移到 MySQL...');
+    try {
+        for (const p of PROJECTS) {
+            const items = loadRawDataLocal(p.storageKey);
+            if (items.length === 0) continue;
+            // 还原 IndexedDB 中的图片
+            for (const item of items) {
+                if (isImgRef(item.image)) {
+                    try { item.image = await imgDBGet(item.image) || ''; } catch (e) { item.image = ''; }
+                }
+                if (isImgRef(item.analysisImage)) {
+                    try { item.analysisImage = await imgDBGet(item.analysisImage) || ''; } catch (e) { item.analysisImage = ''; }
+                }
+            }
+            await fetch(API_BASE + '/api/items/' + p.storageKey, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items)
+            });
+            // 图片存入 MySQL
+            for (const item of items) {
+                if (isDataURL(item.image)) {
+                    const key = imgKey(p.id, item.id, 'Q');
+                    await fetch(API_BASE + '/api/images/' + key, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ data_url: item.image })
+                    });
+                }
+                if (isDataURL(item.analysisImage)) {
+                    const key = imgKey(p.id, item.id, 'A');
+                    await fetch(API_BASE + '/api/images/' + key, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ data_url: item.analysisImage })
+                    });
+                }
+            }
+        }
+        console.log('✅ 数据迁移完成');
+        showToast('✅ 数据已迁移到 MySQL！');
+    } catch (e) {
+        console.warn('迁移失败:', e);
+    }
 }
 
 // MySQL 模式下的数据加载
