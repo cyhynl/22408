@@ -1364,3 +1364,123 @@ li { margin-bottom: 4px; }
     .modal { padding: 20px; }
     .sidebar-nav { font-size: 9pt; }
 }
+
+/* =========================================================
+   Markdown 渲染内容样式
+   ========================================================= */
+
+/* 表格 */
+.item-body table,
+.item-analysis table,
+.quiz-answer table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    font-size: 9.5pt;
+}
+.item-body th,
+.item-body td,
+.item-analysis th,
+.item-analysis td,
+.quiz-answer th,
+.quiz-answer td {
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    text-align: left;
+}
+.item-body th,
+.item-analysis th,
+.quiz-answer th {
+    background: var(--primary-light);
+    font-weight: 600;
+}
+.item-body tr:nth-child(even),
+.item-analysis tr:nth-child(even),
+.quiz-answer tr:nth-child(even) {
+    background: #fafafa;
+}
+
+/* 行内代码 */
+.item-body code,
+.item-analysis code,
+.quiz-answer code,
+.item-prop code,
+.item-counter code,
+.item-meaning-box code,
+.item-note-box code,
+.callout-box code {
+    background: #edf2f7;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.92em;
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    color: #c53030;
+}
+
+/* 代码块 */
+.item-body pre,
+.item-analysis pre,
+.quiz-answer pre {
+    background: #2d3748;
+    color: #e2e8f0;
+    padding: 12px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 9pt;
+    line-height: 1.5;
+    margin: 10px 0;
+}
+.item-body pre code,
+.item-analysis pre code,
+.quiz-answer pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+}
+
+/* 引用块 */
+.item-body blockquote,
+.item-analysis blockquote,
+.quiz-answer blockquote {
+    border-left: 3px solid var(--primary);
+    margin: 10px 0;
+    padding: 6px 14px;
+    background: #f7fafc;
+    color: #4a5568;
+    font-style: italic;
+}
+
+/* 列表 */
+.item-body ul,
+.item-body ol,
+.item-analysis ul,
+.item-analysis ol,
+.quiz-answer ul,
+.quiz-answer ol {
+    padding-left: 22px;
+    margin: 6px 0;
+}
+
+/* 水平线 */
+.item-body hr,
+.item-analysis hr,
+.quiz-answer hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 14px 0;
+}
+
+/* 链接 */
+.item-body a,
+.item-analysis a,
+.quiz-answer a {
+    color: var(--primary);
+    text-decoration: underline;
+}
+.item-body a:hover,
+.item-analysis a:hover,
+.quiz-answer a:hover {
+    color: var(--primary-dark);
+}
+

@@ -478,12 +478,7 @@ function showItem(projId, itemId) {
     const navEl = document.querySelector(`.nav-item[data-project-id="${projId}"][data-item-id="${itemId}"]`);
     if (navEl) navEl.classList.add('active');
 
-    if (window.renderMathInElement) {
-        renderMathInElement(el, {
-            delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
-            throwOnError: false
-        });
-    }
+    renderKaTeX(el);
 }
 
 function renderItemContent(config, groupName, item) {
@@ -494,9 +489,9 @@ function renderItemContent(config, groupName, item) {
 
     if (isEnglish) {
         const meaningHtml = item.meaning
-            ? `<div class="item-meaning-box"><span class="label">📖 释义：</span>${escapeHtml(item.meaning)}</div>` : '';
+            ? `<div class="item-meaning-box"><span class="label">📖 释义：</span>${renderContent(item.meaning)}</div>` : '';
         const noteHtml = item.note
-            ? `<div class="item-note-box"><span class="label">💡 备注：</span>${escapeHtml(item.note)}</div>` : '';
+            ? `<div class="item-note-box"><span class="label">💡 备注：</span>${renderContent(item.note)}</div>` : '';
 
         return `
             <div class="item-project-bar">
@@ -505,7 +500,7 @@ function renderItemContent(config, groupName, item) {
             </div>
             <div class="item-header">
                 <div class="item-number">#${item.id.replace('item-', '')}</div>
-                <h1 class="item-title">${escapeHtml(item.content)}</h1>
+                <h1 class="item-title">${renderContent(item.content)}</h1>
                 <div class="item-stats">
                     <span class="stat-forgot">❌ 没记住 ${item.forgotCount || 0} 次</span>
                     <span class="stat-remembered">✅ 记住了 ${item.rememberedCount || 0} 次</span>
@@ -526,7 +521,7 @@ function renderItemContent(config, groupName, item) {
             </div>`;
     } else {
         const calloutHtml = item.callout
-            ? `<div class="callout-box"><div class="callout-title">💡 ${FIELD_LABELS.error.callout}</div>${item.callout}</div>` : '';
+            ? `<div class="callout-box"><div class="callout-title">💡 ${FIELD_LABELS.error.callout}</div>${renderContent(item.callout)}</div>` : '';
 
         return `
             <div class="item-project-bar">
@@ -535,7 +530,7 @@ function renderItemContent(config, groupName, item) {
             </div>
             <div class="item-header">
                 <div class="item-number">#${item.id.replace('ce-', '')}</div>
-                <h1 class="item-title">${escapeHtml(item.title)}</h1>
+                <h1 class="item-title">${renderContent(item.title)}</h1>
                 <div class="item-tags">${tagsHtml}</div>
                 <div class="item-actions">
                     <button onclick="editItem('${config.id}','${item.id}')">✏️ 编辑</button>
@@ -544,9 +539,9 @@ function renderItemContent(config, groupName, item) {
             </div>
             <div class="item-body">
                 ${imageHtml}
-                <div class="item-prop"><span class="label">● ${FIELD_LABELS.error.proposition}：</span>${item.proposition || ''}</div>
-                <div class="item-counter"><span class="label" style="color:var(--danger)">● ${FIELD_LABELS.error.counter}：</span>${item.counterexample || ''}</div>
-                <div class="item-analysis">${item.analysis || ''}</div>
+                <div class="item-prop"><span class="label">● ${FIELD_LABELS.error.proposition}：</span>${renderContent(item.proposition || '')}</div>
+                <div class="item-counter"><span class="label" style="color:var(--danger)">● ${FIELD_LABELS.error.counter}：</span>${renderContent(item.counterexample || '')}</div>
+                <div class="item-analysis">${renderContent(item.analysis || '')}</div>
                 ${analysisImageHtml}
                 ${calloutHtml}
             </div>
@@ -834,9 +829,9 @@ function onProjectChange() {
     document.getElementById('labelCallout').textContent = isEnglish ? '记忆技巧' : FIELD_LABELS.error.callout;
 
     // 场景调整placeholder
-    document.getElementById('itemProposition').placeholder = isEnglish ? '输入单词、词组或句子' : '支持 KaTeX 公式 $...$ 或 $$...$$';
+    document.getElementById('itemProposition').placeholder = isEnglish ? '输入单词、词组或句子' : '支持 Markdown 和 KaTeX 公式 $...$ 或 $$...$$';
     document.getElementById('itemCounter').placeholder = isEnglish ? '输入释义或翻译' : '记录易错点或反例……';
-    document.getElementById('itemAnalysis').placeholder = isEnglish ? '记忆技巧、例句等' : '支持 KaTeX 公式 $...$ 或 $$...$$';
+    document.getElementById('itemAnalysis').placeholder = isEnglish ? '记忆技巧、例句等' : '支持 Markdown 和 KaTeX 公式 $...$ 或 $$...$$';
     document.getElementById('itemCallout').placeholder = isEnglish ? '额外注解' : '总结、避坑指南等……';
 
     populateGroupListForProject(projId);
@@ -1151,6 +1146,34 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// =============================================================
+//  统一渲染：Markdown + KaTeX
+// =============================================================
+function renderContent(text) {
+    if (!text) return '';
+    // 第一步：Markdown → HTML（$ 符号原样保留，不被转义）
+    let html = '';
+    if (typeof marked !== 'undefined') {
+        html = marked.parse(text, { breaks: true });
+    } else {
+        html = escapeHtml(text).replace(/\n/g, '<br>');
+    }
+    return html;
+}
+
+// 对已注入 DOM 的元素进行 KaTeX 渲染
+function renderKaTeX(el) {
+    if (window.renderMathInElement) {
+        renderMathInElement(el, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });
+    }
+}
+
 // 视觉反馈：高亮当前活跃的上传区域（点击标签或区域时触发）
 function setActiveImageTarget(target) {
     document.querySelectorAll('.image-upload-area').forEach(el => el.classList.remove('active'));
@@ -1353,13 +1376,13 @@ function showQuizCard() {
     // 构建答案内容
     let answerHtml = '';
     if (isEnglish) {
-        if (item.meaning) answerHtml += `<div><span class="answer-label">📖 释义：</span>${escapeHtml(item.meaning)}</div>`;
-        if (item.note) answerHtml += `<div style="margin-top:8px;"><span class="answer-label">💡 备注：</span>${escapeHtml(item.note)}</div>`;
+        if (item.meaning) answerHtml += `<div><span class="answer-label">📖 释义：</span>${renderContent(item.meaning)}</div>`;
+        if (item.note) answerHtml += `<div style="margin-top:8px;"><span class="answer-label">💡 备注：</span>${renderContent(item.note)}</div>`;
     } else {
-        if (item.proposition) answerHtml += `<div><span class="answer-label">📌 考点：</span>${item.proposition}</div>`;
-        if (item.counterexample) answerHtml += `<div style="margin-top:8px;"><span class="answer-label">⚠️ 易错点：</span>${item.counterexample}</div>`;
-        if (item.analysis) answerHtml += `<div style="margin-top:8px;">${item.analysis}</div>`;
-        if (item.callout) answerHtml += `<div style="margin-top:8px;color:var(--danger);font-weight:600;">💡 ${item.callout}</div>`;
+        if (item.proposition) answerHtml += `<div><span class="answer-label">📌 考点：</span>${renderContent(item.proposition)}</div>`;
+        if (item.counterexample) answerHtml += `<div style="margin-top:8px;"><span class="answer-label">⚠️ 易错点：</span>${renderContent(item.counterexample)}</div>`;
+        if (item.analysis) answerHtml += `<div style="margin-top:8px;">${renderContent(item.analysis)}</div>`;
+        if (item.callout) answerHtml += `<div style="margin-top:8px;color:var(--danger);font-weight:600;">💡 ${renderContent(item.callout)}</div>`;
     }
     answerHtml += analysisImageHtml;
 
@@ -1367,7 +1390,7 @@ function showQuizCard() {
         <div class="quiz-tags">${tagsHtml}</div>
         <span class="quiz-project-badge" style="background:${config.color}">${config.icon} ${config.name} · ${group}</span>
         ${imageHtml}
-        <div class="quiz-question">${escapeHtml(title)}</div>
+        <div class="quiz-question">${renderContent(title)}</div>
         <div class="quiz-answer" id="quizAnswer">${answerHtml}</div>
     `;
 
@@ -1379,12 +1402,7 @@ function showQuizCard() {
     quizRevealed = false;
 
     // 渲染 KaTeX
-    if (window.renderMathInElement) {
-        renderMathInElement(document.getElementById('quizContent'), {
-            delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
-            throwOnError: false
-        });
-    }
+    renderKaTeX(document.getElementById('quizContent'));
 }
 
 function revealAnswer() {
