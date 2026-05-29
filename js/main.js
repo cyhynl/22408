@@ -72,6 +72,93 @@ function saveRawData(storageKey, data) {
 }
 
 // =============================================================
+//  IndexedDB 图片存储（突破 localStorage 5MB 限制）
+// =============================================================
+const IMG_DB_NAME = '22408_img';
+const IMG_STORE = 'images';
+let imgDB = null;
+
+function openImgDB() {
+    return new Promise((resolve, reject) => {
+        if (imgDB) return resolve(imgDB);
+        const req = indexedDB.open(IMG_DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IMG_STORE)) {
+                db.createObjectStore(IMG_STORE);
+            }
+        };
+        req.onsuccess = (e) => { imgDB = e.target.result; resolve(imgDB); };
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function imgDBSet(key, dataURL) {
+    const db = await openImgDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IMG_STORE, 'readwrite');
+        tx.objectStore(IMG_STORE).put(dataURL, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+async function imgDBGet(key) {
+    const db = await openImgDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IMG_STORE, 'readonly');
+        const req = tx.objectStore(IMG_STORE).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function imgDBDelete(key) {
+    const db = await openImgDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(IMG_STORE, 'readwrite');
+        tx.objectStore(IMG_STORE).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+// 压缩图片：缩小尺寸 + 降低质量，大幅减少存储空间
+function compressImage(dataURL, maxW = 800, quality = 0.6) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            let w = img.width, h = img.height;
+            if (w <= maxW) return resolve(dataURL); // 无需压缩
+            h = Math.round(h * maxW / w);
+            w = maxW;
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(dataURL); // 加载失败则原样返回
+        img.src = dataURL;
+    });
+}
+
+// 生成图片唯一 key
+function imgKey(projId, itemId, type) {
+    return `img_${projId}_${itemId}_${type}`; // type: 'Q' 题目图, 'A' 解析图
+}
+
+// 检查字符串是否为 data URL（已存储在 IndexedDB 的引用）
+function isDataURL(str) {
+    return str && str.startsWith('data:');
+}
+
+// 检查字符串是否为 IndexedDB 引用 key
+function isImgRef(str) {
+    return str && str.startsWith('img_');
+}
+
+// =============================================================
 //  构建统一数据树
 // =============================================================
 let unifiedTree = []; // [{ projConfig, groups: [{ name, items: [...] }] }]
@@ -154,17 +241,42 @@ function setRawArray(config, data) {
 // =============================================================
 //  保存状态（同时写回原始 localStorage）
 // =============================================================
-function flushAll() {
+async function flushAll() {
+    const imgPromises = [];
+
     for (const entry of unifiedTree) {
         const config = entry.config;
-        const allItems = [];
+        const saveItems = []; // 副本数组，不修改 unifiedTree 中的原始 item
+
         for (const g of entry.groups) {
             for (const item of g.items) {
-                allItems.push(item);
+                const copy = { ...item };
+
+                // 图片：data URL → 压缩并存入 IndexedDB，副本中用引用 key
+                if (isDataURL(copy.image)) {
+                    const key = imgKey(config.id, copy.id, 'Q');
+                    imgPromises.push(
+                        compressImage(copy.image).then(compressed => imgDBSet(key, compressed))
+                    );
+                    copy.image = key;
+                }
+                // 如果已经是引用 key，保留不变
+                if (isDataURL(copy.analysisImage)) {
+                    const key = imgKey(config.id, copy.id, 'A');
+                    imgPromises.push(
+                        compressImage(copy.analysisImage).then(compressed => imgDBSet(key, compressed))
+                    );
+                    copy.analysisImage = key;
+                }
+
+                saveItems.push(copy);
             }
         }
-        setRawArray(config, allItems);
+        setRawArray(config, saveItems);
     }
+
+    // 后台等待 IndexedDB 写入完成
+    await Promise.all(imgPromises).catch(e => console.warn('IndexedDB 图片存储失败:', e));
 }
 
 // =============================================================
@@ -777,6 +889,7 @@ function handleProjectDrop(dragData, targetEl) {
 // =============================================================
 function rebuildAll() {
     buildUnifiedTree();
+    restoreImagesFromIDB(); // 异步从 IndexedDB 还原图片
     renderNav();
     // 重建内容 DOM
     document.querySelectorAll('.content-item').forEach(el => el.remove());
@@ -786,6 +899,39 @@ function rebuildAll() {
         document.getElementById('welcomePage').classList.add('visible');
     }
 
+}
+
+// 从 IndexedDB 还原图片到 unifiedTree 内存中
+async function restoreImagesFromIDB() {
+    const promises = [];
+    for (const entry of unifiedTree) {
+        const projId = entry.config.id;
+        for (const g of entry.groups) {
+            for (const item of g.items) {
+                if (isImgRef(item.image)) {
+                    promises.push(
+                        imgDBGet(item.image).then(dataURL => {
+                            if (dataURL) item.image = dataURL;
+                            else item.image = ''; // IDB 中没有则清空
+                        })
+                    );
+                }
+                if (isImgRef(item.analysisImage)) {
+                    promises.push(
+                        imgDBGet(item.analysisImage).then(dataURL => {
+                            if (dataURL) item.analysisImage = dataURL;
+                            else item.analysisImage = '';
+                        })
+                    );
+                }
+            }
+        }
+    }
+    await Promise.all(promises);
+    // 图片还原后刷新当前视图
+    if (currentView) {
+        showItem(currentView.projId, currentView.itemId);
+    }
 }
 
 // =============================================================
@@ -1113,6 +1259,21 @@ function deleteItem(projId, itemId) {
     const entry = unifiedTree.find(e => e.config.id === projId);
     if (!entry) return;
 
+    // 删除前清理 IndexedDB 中的图片
+    let deletedItem = null;
+    for (const g of entry.groups) {
+        deletedItem = g.items.find(i => i.id === itemId);
+        if (deletedItem) break;
+    }
+    if (deletedItem) {
+        if (deletedItem.image || isImgRef(deletedItem.image)) {
+            imgDBDelete(imgKey(projId, itemId, 'Q')).catch(() => {});
+        }
+        if (deletedItem.analysisImage || isImgRef(deletedItem.analysisImage)) {
+            imgDBDelete(imgKey(projId, itemId, 'A')).catch(() => {});
+        }
+    }
+
     for (const g of entry.groups) {
         g.items = g.items.filter(i => i.id !== itemId);
     }
@@ -1212,10 +1373,12 @@ function previewImage(event, target) {
     if (!file) return;
     const suffix = target === 'analysis' ? 'A' : 'Q';
     const reader = new FileReader();
-    reader.onload = function(e) {
-        document.getElementById('previewImg' + suffix).src = e.target.result;
+    reader.onload = async function(e) {
+        // 自动压缩图片
+        const compressed = await compressImage(e.target.result, 800, 0.6);
+        document.getElementById('previewImg' + suffix).src = compressed;
         document.getElementById('imagePreview' + suffix).style.display = 'block';
-        document.getElementById('imageStatus' + suffix).textContent = '已选择图片';
+        document.getElementById('imageStatus' + suffix).textContent = '已选择图片（已压缩）';
         document.getElementById('imageStatus' + suffix).classList.add('has-image');
     };
     reader.readAsDataURL(file);
@@ -1243,10 +1406,11 @@ function pasteImageToTarget(e, target) {
             }
             const suffix = target === 'analysis' ? 'A' : 'Q';
             const reader = new FileReader();
-            reader.onload = function(ev) {
-                document.getElementById('previewImg' + suffix).src = ev.target.result;
+            reader.onload = async function(ev) {
+                const compressed = await compressImage(ev.target.result, 800, 0.6);
+                document.getElementById('previewImg' + suffix).src = compressed;
                 document.getElementById('imagePreview' + suffix).style.display = 'block';
-                document.getElementById('imageStatus' + suffix).textContent = '已粘贴图片';
+                document.getElementById('imageStatus' + suffix).textContent = '已粘贴图片（已压缩）';
                 document.getElementById('imageStatus' + suffix).classList.add('has-image');
             };
             reader.onerror = function() {
@@ -1275,11 +1439,24 @@ function clearImage(target) {
 // =============================================================
 //  数据导出
 // =============================================================
-function exportData() {
+async function exportData() {
     const allData = {};
     for (const p of PROJECTS) {
         const raw = loadRawData(p.storageKey);
-        if (raw.length > 0) allData[p.storageKey] = raw;
+        if (raw.length === 0) continue;
+        // 将 IndexedDB 引用还原为实际 data URL，确保导出文件自包含
+        const exported = [];
+        for (const item of raw) {
+            const copy = { ...item };
+            if (isImgRef(copy.image)) {
+                copy.image = await imgDBGet(copy.image) || '';
+            }
+            if (isImgRef(copy.analysisImage)) {
+                copy.analysisImage = await imgDBGet(copy.analysisImage) || '';
+            }
+            exported.push(copy);
+        }
+        allData[p.storageKey] = exported;
     }
     if (Object.keys(allData).length === 0) {
         showToast('暂无数据可导出', 'error');
@@ -1301,16 +1478,41 @@ function importData(event) {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             const data = JSON.parse(e.target.result);
             let count = 0;
+            const imgPromises = [];
             for (const key of Object.keys(data)) {
-                if (PROJECTS.some(p => p.storageKey === key) && Array.isArray(data[key])) {
-                    saveRawData(key, data[key]);
-                    count += data[key].length;
+                if (!PROJECTS.some(p => p.storageKey === key) || !Array.isArray(data[key])) continue;
+                const items = data[key];
+                for (const item of items) {
+                    // 导入的图片 data URL 立即存入 IndexedDB，localStorage 只存引用
+                    if (isDataURL(item.image)) {
+                        const imgKeyVal = imgKey(
+                            PROJECTS.find(p => p.storageKey === key)?.id || 'unknown',
+                            item.id, 'Q'
+                        );
+                        imgPromises.push(
+                            compressImage(item.image).then(c => imgDBSet(imgKeyVal, c))
+                        );
+                        item.image = imgKeyVal;
+                    }
+                    if (isDataURL(item.analysisImage)) {
+                        const imgKeyVal = imgKey(
+                            PROJECTS.find(p => p.storageKey === key)?.id || 'unknown',
+                            item.id, 'A'
+                        );
+                        imgPromises.push(
+                            compressImage(item.analysisImage).then(c => imgDBSet(imgKeyVal, c))
+                        );
+                        item.analysisImage = imgKeyVal;
+                    }
                 }
+                saveRawData(key, items);
+                count += items.length;
             }
+            await Promise.all(imgPromises).catch(e => console.warn('导入图片存储失败:', e));
             if (count > 0) {
                 rebuildAll();
                 showToast(`📥 成功导入 ${count} 项数据`);
@@ -1319,6 +1521,7 @@ function importData(event) {
             }
         } catch (err) {
             showToast('文件格式错误，请选择有效的 JSON 文件', 'error');
+            console.error(err);
         }
     };
     reader.readAsText(file);
