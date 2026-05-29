@@ -2,12 +2,13 @@
 # 启动: python server.py
 # 前端自动检测 localhost:5000，可用则使用 MySQL，否则回退浏览器存储
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pymysql
 import json
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 DB_CONFIG = {
@@ -148,7 +149,19 @@ def delete_image(img_key):
     finally:
         conn.close()
 
+# 托管前端静态文件
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')
+
+@app.route('/<path:path>')
+def static_files(path):
+    if os.path.exists(path):
+        return send_from_directory('.', path)
+    return send_from_directory('.', 'index.html')
+
 if __name__ == '__main__':
     init_db()
     print("🚀 22408 后端服务启动: http://localhost:5000")
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    # host='0.0.0.0' 允局域网内其他设备访问
+    app.run(host='0.0.0.0', port=5000, debug=False)

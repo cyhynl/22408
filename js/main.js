@@ -6,7 +6,9 @@
 //  MySQL 后端模式（自动检测 localhost:5000）
 // =============================================================
 let useMySQL = false;
-const API_BASE = 'http://localhost:5000';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000'
+    : window.location.origin.replace(/:\d+$/, '') + ':5000';
 
 async function checkMySQL() {
     try {
