@@ -7,7 +7,7 @@
 // =============================================================
 const PROJECTS = [
     { id: 'proj-math-err', name: '高等数学例题集',  storageKey: 'math_error_collection',  color: '#b8322c', icon: '📕', type: 'error' },
-    { id: 'proj-math-ce',  name: '高等数学经典反例', storageKey: 'math_counterexamples', color: '#2b6cb0', icon: '📘', type: 'error' },
+    { id: 'proj-math-ce',  name: '高等数学经典例子', storageKey: 'math_counterexamples', color: '#2b6cb0', icon: '📘', type: 'error' },
     { id: 'proj-linear',   name: '线性代数例题集',   storageKey: 'linear_error_collection', color: '#d69e2e', icon: '📗', type: 'error' },
     { id: 'proj-os',       name: '操作系统例题集',   storageKey: 'os_error_collection',   color: '#805ad5', icon: '🟣', type: 'error' },
     { id: 'proj-ds',       name: '数据结构例题集',   storageKey: 'ds_error_collection',   color: '#dd6b20', icon: '🟠', type: 'error' },
@@ -830,7 +830,7 @@ function onProjectChange() {
 
     // 场景调整placeholder
     document.getElementById('itemProposition').placeholder = isEnglish ? '输入单词、词组或句子' : '支持 Markdown 和 KaTeX 公式 $...$ 或 $$...$$';
-    document.getElementById('itemCounter').placeholder = isEnglish ? '输入释义或翻译' : '记录易错点或反例……';
+    document.getElementById('itemCounter').placeholder = isEnglish ? '输入释义或翻译' : '记录易错点或例子……';
     document.getElementById('itemAnalysis').placeholder = isEnglish ? '记忆技巧、例句等' : '支持 Markdown 和 KaTeX 公式 $...$ 或 $$...$$';
     document.getElementById('itemCallout').placeholder = isEnglish ? '额外注解' : '总结、避坑指南等……';
 
