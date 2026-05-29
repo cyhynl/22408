@@ -1151,10 +1151,24 @@ function escapeHtml(text) {
 // =============================================================
 function renderContent(text) {
     if (!text) return '';
-    // 第一步：Markdown → HTML（$ 符号原样保留，不被转义）
     let html = '';
     if (typeof marked !== 'undefined') {
-        html = marked.parse(text, { breaks: true });
+        // 先用占位符保护 KaTeX 公式，防止 Markdown 破坏 $ 和 _ 等符号
+        const katexBlocks = [];
+        // 保护 $$...$$（块级公式，跨行）
+        let processed = text.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+            katexBlocks.push(match);
+            return `\x00KTX${katexBlocks.length - 1}\x00`;
+        });
+        // 保护 $...$（行内公式，不跨行）
+        processed = processed.replace(/\$([^\n$]+?)\$/g, (match) => {
+            katexBlocks.push(match);
+            return `\x00KTX${katexBlocks.length - 1}\x00`;
+        });
+        // Markdown → HTML
+        html = marked.parse(processed, { breaks: true });
+        // 还原 KaTeX 公式
+        html = html.replace(/\x00KTX(\d+)\x00/g, (_, i) => katexBlocks[parseInt(i)]);
     } else {
         html = escapeHtml(text).replace(/\n/g, '<br>');
     }
