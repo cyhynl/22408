@@ -62,7 +62,13 @@ function loadRawData(storageKey) {
 }
 
 function saveRawData(storageKey, data) {
-    localStorage.setItem(storageKey, JSON.stringify(data));
+    try {
+        localStorage.setItem(storageKey, JSON.stringify(data));
+    } catch (e) {
+        console.error('localStorage 保存失败:', storageKey, e);
+        showToast('❌ 存储空间不足！请清理一些图片或导出数据后重试', 'error');
+        throw e;
+    }
 }
 
 // =============================================================
@@ -1072,24 +1078,29 @@ function saveItem(e) {
         showToast('🎉 添加成功！');
     }
 
-    flushAll();
-    rebuildAll();
-    closeModal();
+    try {
+        flushAll();
+        rebuildAll();
+        closeModal();
 
-    // 恢复项目下拉状态
-    document.getElementById('itemProject').disabled = false;
+        // 恢复项目下拉状态
+        document.getElementById('itemProject').disabled = false;
 
-    if (editId) {
-        showItem(projId, editId);
-    } else {
-        // 显示最后添加的项
-        const e = unifiedTree.find(ee => ee.config.id === projId);
-        if (e && e.groups.length > 0) {
-            const lastG = e.groups[e.groups.length - 1];
-            if (lastG.items.length > 0) {
-                showItem(projId, lastG.items[lastG.items.length - 1].id);
+        if (editId) {
+            showItem(projId, editId);
+        } else {
+            // 显示最后添加的项
+            const e = unifiedTree.find(ee => ee.config.id === projId);
+            if (e && e.groups.length > 0) {
+                const lastG = e.groups[e.groups.length - 1];
+                if (lastG.items.length > 0) {
+                    showItem(projId, lastG.items[lastG.items.length - 1].id);
+                }
             }
         }
+    } catch (e) {
+        // 保存失败，模态框保持打开，数据不丢失
+        console.error('保存失败:', e);
     }
 }
 
