@@ -1617,7 +1617,7 @@ function clearImage(target) {
 async function exportData() {
     const allData = {};
     for (const p of PROJECTS) {
-        const raw = loadRawData(p.storageKey);
+        const raw = await loadRawData(p.storageKey);
         if (raw.length === 0) continue;
         // 将 IndexedDB 引用还原为实际 data URL，确保导出文件自包含
         const exported = [];
