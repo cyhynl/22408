@@ -3,6 +3,106 @@
 // =============================================================
 
 // =============================================================
+//  MySQL 后端模式（自动检测 localhost:5000）
+// =============================================================
+let useMySQL = false;
+const API_BASE = 'http://localhost:5000';
+
+async function checkMySQL() {
+    try {
+        const resp = await fetch(API_BASE + '/api/health');
+        const data = await resp.json();
+        if (data.db === 'mysql') {
+            useMySQL = true;
+            console.log('✅ MySQL 后端已连接');
+            return true;
+        }
+    } catch (e) {
+        console.log('ℹ️ 未检测到 MySQL 后端，使用浏览器存储');
+    }
+    return false;
+}
+
+// MySQL 模式下的数据加载
+async function loadRawDataMySQL(storageKey) {
+    try {
+        const resp = await fetch(API_BASE + '/api/items/' + storageKey);
+        const items = await resp.json();
+        // 还原图片：如果是 ref key，从 MySQL images 表加载
+        for (const item of items) {
+            if (isImgRef(item.image)) {
+                try {
+                    const r = await fetch(API_BASE + '/api/images/' + item.image);
+                    const d = await r.json();
+                    if (d.data_url) item.image = d.data_url;
+                    else item.image = '';
+                } catch (e) { item.image = ''; }
+            }
+            if (isImgRef(item.analysisImage)) {
+                try {
+                    const r = await fetch(API_BASE + '/api/images/' + item.analysisImage);
+                    const d = await r.json();
+                    if (d.data_url) item.analysisImage = d.data_url;
+                    else item.analysisImage = '';
+                } catch (e) { item.analysisImage = ''; }
+            }
+        }
+        return items;
+    } catch (e) {
+        console.warn('MySQL 加载失败，回退:', e);
+        return loadRawDataLocal(storageKey);
+    }
+}
+
+// MySQL 模式下的数据保存
+async function flushAllMySQL() {
+    const imgPromises = [];
+    for (const entry of unifiedTree) {
+        const config = entry.config;
+        const saveItems = [];
+        for (const g of entry.groups) {
+            for (const item of g.items) {
+                const copy = { ...item };
+                if (isDataURL(copy.image)) {
+                    const key = imgKey(config.id, copy.id, 'Q');
+                    imgPromises.push(
+                        fetch(API_BASE + '/api/images/' + key, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data_url: await compressImage(copy.image) })
+                        })
+                    );
+                    copy.image = key;
+                }
+                if (isDataURL(copy.analysisImage)) {
+                    const key = imgKey(config.id, copy.id, 'A');
+                    imgPromises.push(
+                        fetch(API_BASE + '/api/images/' + key, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data_url: await compressImage(copy.analysisImage) })
+                        })
+                    );
+                    copy.analysisImage = key;
+                }
+                saveItems.push(copy);
+            }
+        }
+        try {
+            await fetch(API_BASE + '/api/items/' + config.storageKey, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(saveItems)
+            });
+        } catch (e) {
+            console.error('MySQL 保存失败:', e);
+            throw e;
+        }
+    }
+    await Promise.all(imgPromises).catch(e => console.warn('图片存储失败:', e));
+}
+
+// =============================================================
 //  项目配置
 // =============================================================
 const PROJECTS = [
@@ -51,14 +151,19 @@ function saveGroupOrder(projId, order) {
 }
 
 // =============================================================
-//  从各项目 localStorage 读取原始数据
+//  从各项目读取原始数据（自动选择 MySQL 或 localStorage）
 // =============================================================
-function loadRawData(storageKey) {
+function loadRawDataLocal(storageKey) {
     const saved = localStorage.getItem(storageKey);
     if (saved) {
         try { return JSON.parse(saved); } catch (e) {}
     }
     return [];
+}
+
+async function loadRawData(storageKey) {
+    if (useMySQL) return await loadRawDataMySQL(storageKey);
+    return loadRawDataLocal(storageKey);
 }
 
 function saveRawData(storageKey, data) {
@@ -163,7 +268,7 @@ function isImgRef(str) {
 // =============================================================
 let unifiedTree = []; // [{ projConfig, groups: [{ name, items: [...] }] }]
 
-function buildUnifiedTree() {
+async function buildUnifiedTree() {
     unifiedTree = [];
 
     // 确定项目顺序
@@ -182,7 +287,7 @@ function buildUnifiedTree() {
         const config = PROJECTS.find(p => p.id === projId);
         if (!config) continue;
 
-        const rawData = loadRawData(config.storageKey);
+        const rawData = await loadRawData(config.storageKey);
         const groups = {};
 
         if (config.type === 'english') {
@@ -242,6 +347,8 @@ function setRawArray(config, data) {
 //  保存状态（同时写回原始 localStorage）
 // =============================================================
 async function flushAll() {
+    if (useMySQL) return await flushAllMySQL();
+
     const imgPromises = [];
 
     for (const entry of unifiedTree) {
@@ -887,8 +994,8 @@ function handleProjectDrop(dragData, targetEl) {
 // =============================================================
 //  重建所有
 // =============================================================
-function rebuildAll() {
-    buildUnifiedTree();
+async function rebuildAll() {
+    await buildUnifiedTree();
     restoreImagesFromIDB(); // 异步从 IndexedDB 还原图片
     renderNav();
     // 重建内容 DOM
@@ -1077,7 +1184,7 @@ function editItem(projId, itemId) {
 // =============================================================
 //  保存
 // =============================================================
-function saveItem(e) {
+async function saveItem(e) {
     e.preventDefault();
 
     const editId = document.getElementById('editId').value;
@@ -1225,8 +1332,8 @@ function saveItem(e) {
     }
 
     try {
-        flushAll();
-        rebuildAll();
+        await flushAll();
+        await rebuildAll();
         closeModal();
 
         // 恢复项目下拉状态
@@ -1698,5 +1805,8 @@ document.addEventListener('DOMContentLoaded', () => {
     expandedGroups.clear();
     saveExpandedGroups2(expandedGroups);
 
-    rebuildAll();
+    // 检测 MySQL 后端，然后初始化
+    checkMySQL().then(() => {
+        rebuildAll();
+    });
 });
