@@ -1,18 +1,18 @@
 // =============================================================
-//  22408 考研全科错题集 - 主文件
+//  22408 考研全科例题集 - 主文件
 // =============================================================
 
 // =============================================================
 //  项目配置
 // =============================================================
 const PROJECTS = [
-    { id: 'proj-math-err', name: '高等数学错题集',  storageKey: 'math_error_collection',  color: '#b8322c', icon: '📕', type: 'error' },
+    { id: 'proj-math-err', name: '高等数学例题集',  storageKey: 'math_error_collection',  color: '#b8322c', icon: '📕', type: 'error' },
     { id: 'proj-math-ce',  name: '高等数学经典反例', storageKey: 'math_counterexamples', color: '#2b6cb0', icon: '📘', type: 'error' },
-    { id: 'proj-linear',   name: '线性代数错题集',   storageKey: 'linear_error_collection', color: '#d69e2e', icon: '📗', type: 'error' },
-    { id: 'proj-os',       name: '操作系统错题集',   storageKey: 'os_error_collection',   color: '#805ad5', icon: '🟣', type: 'error' },
-    { id: 'proj-ds',       name: '数据结构错题集',   storageKey: 'ds_error_collection',   color: '#dd6b20', icon: '🟠', type: 'error' },
-    { id: 'proj-cn',       name: '计算机网络错题集',  storageKey: 'cn_error_collection',   color: '#00a3c4', icon: '🟦', type: 'error' },
-    { id: 'proj-co',       name: '计算机组成原理错题集', storageKey: 'co_error_collection', color: '#c53030', icon: '🔴', type: 'error' },
+    { id: 'proj-linear',   name: '线性代数例题集',   storageKey: 'linear_error_collection', color: '#d69e2e', icon: '📗', type: 'error' },
+    { id: 'proj-os',       name: '操作系统例题集',   storageKey: 'os_error_collection',   color: '#805ad5', icon: '🟣', type: 'error' },
+    { id: 'proj-ds',       name: '数据结构例题集',   storageKey: 'ds_error_collection',   color: '#dd6b20', icon: '🟠', type: 'error' },
+    { id: 'proj-cn',       name: '计算机网络例题集',  storageKey: 'cn_error_collection',   color: '#00a3c4', icon: '🟦', type: 'error' },
+    { id: 'proj-co',       name: '计算机组成原理例题集', storageKey: 'co_error_collection', color: '#c53030', icon: '🔴', type: 'error' },
     { id: 'proj-en',       name: '英语背诵助手',     storageKey: 'english_memorize_items', color: '#38a169', icon: '📗', type: 'english' }
 ];
 
