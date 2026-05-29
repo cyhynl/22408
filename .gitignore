@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Thumbnail cache
+Thumbs.db
+
+# Backup files
+*.json.backup
+
+# IDE
+.vscode/
+.idea/

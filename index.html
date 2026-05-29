@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>22408 · 考研全科错题集</title>
+
+    <!-- KaTeX CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+    <!-- KaTeX JS -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+    <!-- KaTeX auto-render -->
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+        onload="renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });">
+    </script>
+
+    <link rel="stylesheet" href="css/style.css?v=1.0">
+</head>
+<body>
+
+    <!-- ============================================================
+         左侧导航栏（三级结构）
+         ============================================================ -->
+    <aside class="sidebar">
+        <div class="sidebar-header" onclick="showWelcomePage()" title="返回首页">
+            <h1>22408<br>考研全科</h1>
+            <div class="subtitle">错题集 · 反例集 · 英语背诵</div>
+        </div>
+
+        <!-- 全局搜索 -->
+        <div class="search-wrapper">
+            <input type="text" class="search-input" id="searchInput" placeholder="🔍 搜索项目、分组、标题…" oninput="onSearchInput(this.value)">
+            <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none;">✕</button>
+        </div>
+
+        <nav class="sidebar-nav" id="sidebarNav">
+            <!-- 由 JavaScript 动态生成三级导航 -->
+        </nav>
+
+        <div class="add-btn-wrapper">
+            <button class="add-btn" onclick="openAddModal()">➕ 新增</button>
+            <div class="toolbar-row">
+                <button class="tool-btn" onclick="startRandomQuiz()" title="随机抽题复习">🎴 随机复习</button>
+                <button class="tool-btn" onclick="showStats()" title="学习统计">📊 统计</button>
+                <button class="tool-btn" onclick="exportData()" title="导出数据为 JSON">📤 导出</button>
+                <button class="tool-btn" onclick="document.getElementById('importFileInput').click()" title="从 JSON 导入数据">📥 导入</button>
+                <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importData(event)">
+            </div>
+        </div>
+    </aside>
+
+    <!-- ============================================================
+         右侧主内容区
+         ============================================================ -->
+    <main class="main-content" id="mainContent">
+
+        <!-- 欢迎页 -->
+        <div class="page-header visible" id="welcomePage">
+            <div class="book-cover">
+                <div class="book-cover-deco"></div>
+                <div class="book-cover-deco2"></div>
+                <div class="book-cover-inner">
+                    <div class="book-label">🏆 考研必胜 🏆</div>
+                    <h2>考研全科<br>错题集</h2>
+                    <div class="book-divider"></div>
+                    <div class="book-sub">📕高数 · 📗线代 · 💻408 · 📙英语 · 一站式上岸</div>
+                    <div class="book-count">🔥 共收录 <span id="totalCount">0</span> 项 · 上岸冲冲冲 🔥</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 内容项由 JS 动态生成 -->
+
+        <!-- ============================================================
+             随机复习模式
+             ============================================================ -->
+        <div class="quiz-area" id="quizArea" style="display:none;">
+            <div class="quiz-header">
+                <span class="quiz-title">🎴 随机复习</span>
+                <span class="quiz-progress" id="quizProgress"></span>
+                <button class="quiz-exit-btn" onclick="exitQuiz()">✕ 退出</button>
+            </div>
+            <div class="quiz-proj-filter">
+                <span style="font-size:9pt;color:var(--text-muted);">筛选项目：</span>
+                <select id="quizProjectFilter" onchange="onQuizFilterChange()" style="font-size:9pt;padding:3px 8px;border:1px solid var(--border);border-radius:4px;">
+                    <option value="all">全部项目</option>
+                </select>
+                <span style="font-size:9pt;color:var(--text-muted);margin-left:8px;">每次</span>
+                <select id="quizCount" style="font-size:9pt;padding:3px 8px;border:1px solid var(--border);border-radius:4px;width:60px;">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                </select>
+                <span style="font-size:9pt;color:var(--text-muted);">题</span>
+                <button class="quiz-start-btn" onclick="startRandomQuiz()">🔄 重新抽题</button>
+            </div>
+            <div class="quiz-card" id="quizCard">
+                <div class="quiz-content" id="quizContent">
+                    <div style="text-align:center;color:var(--text-muted);padding:40px 0;font-size:12pt;">
+                        👆 点击「随机复习」开始
+                    </div>
+                </div>
+            </div>
+            <div class="quiz-actions" id="quizActions" style="display:none;">
+                <button class="quiz-reveal-btn" id="quizRevealBtn" onclick="revealAnswer()">👁️ 显示答案</button>
+                <button class="quiz-next-btn" id="quizNextBtn" style="display:none;" onclick="nextQuiz()">➡️ 下一题</button>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             新增/编辑模态框
+             ============================================================ -->
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2 id="modalTitle">📝 新增</h2>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
+
+                <form id="itemForm" onsubmit="saveItem(event)">
+                    <input type="hidden" id="editId" value="">
+                    <input type="hidden" id="editProject" value="">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="itemProject">所属项目 <span class="hint">* 必选</span></label>
+                            <select id="itemProject" required onchange="onProjectChange()"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="itemGroup">分组 <span class="hint">* 必填，支持选择或输入新分组</span></label>
+                            <input type="text" id="itemGroup" list="groupList" placeholder="选择或输入分组" required
+                                   onmousedown="this.dataset.prev=this.value;this.value=''"
+                                   onblur="if(!this.value&&this.dataset.prev)this.value=this.dataset.prev">
+                            <datalist id="groupList"></datalist>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="itemTitle">标题 <span class="hint">* 必填</span></label>
+                        <input type="text" id="itemTitle" placeholder="输入标题" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="itemTags">标签 <span class="hint">用逗号分隔</span></label>
+                        <input type="text" id="itemTags" placeholder="例如：极限, 导数, 易错">
+                    </div>
+
+                    <div class="form-group" id="fieldProposition">
+                        <label id="labelProposition">题目/考点</label>
+                        <textarea id="itemProposition" placeholder="支持 KaTeX 公式 $...$ 或 $$...$$"></textarea>
+                    </div>
+
+                    <div class="form-group" id="fieldCounter">
+                        <label id="labelCounter">易错点/反例</label>
+                        <textarea id="itemCounter" placeholder="记录易错点或反例……"></textarea>
+                    </div>
+
+                    <!-- 题目图片 -->
+                    <div class="form-group">
+                        <label onclick="setActiveImageTarget('question')" style="cursor:pointer;">📷 题目图片 <span class="hint">选填 · 点击选中后 Ctrl+V 粘贴</span></label>
+                        <div class="image-upload-area" id="imageUploadArea" onclick="setActiveImageTarget('question')" tabindex="0">
+                            <span class="image-status" id="imageStatusQ" onclick="event.stopPropagation();setActiveImageTarget('question')">📋 点击此处或 Ctrl+V 粘贴</span>
+                            <span class="file-input-wrapper" onclick="event.stopPropagation();setActiveImageTarget('question')">📁 浏览
+                                <input type="file" id="itemImage" accept="image/*" onchange="previewImage(event,'question')">
+                            </span>
+                        </div>
+                        <div id="imagePreviewQ" style="display:none;margin-top:6px;position:relative;">
+                            <img id="previewImgQ" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--border);">
+                            <button type="button" onclick="clearImage('question')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:4px;cursor:pointer;padding:2px 8px;font-size:9pt;">✕</button>
+                        </div>
+                    </div>
+
+                    <!-- 解析图片 -->
+                    <div class="form-group">
+                        <label onclick="setActiveImageTarget('analysis')" style="cursor:pointer;">📖 解析图片 <span class="hint">选填 · 点击选中后 Ctrl+V 粘贴</span></label>
+                        <div class="image-upload-area" id="analysisUploadArea" onclick="setActiveImageTarget('analysis')" tabindex="0">
+                            <span class="image-status" id="imageStatusA" onclick="event.stopPropagation();setActiveImageTarget('analysis')">📋 点击此处或 Ctrl+V 粘贴</span>
+                            <span class="file-input-wrapper" onclick="event.stopPropagation();setActiveImageTarget('analysis')">📁 浏览
+                                <input type="file" id="itemAnalysisImage" accept="image/*" onchange="previewImage(event,'analysis')">
+                            </span>
+                        </div>
+                        <div id="imagePreviewA" style="display:none;margin-top:6px;position:relative;">
+                            <img id="previewImgA" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--border);">
+                            <button type="button" onclick="clearImage('analysis')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:4px;cursor:pointer;padding:2px 8px;font-size:9pt;">✕</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label id="labelAnalysis">详细分析</label>
+                        <textarea id="itemAnalysis" class="analysis" placeholder="支持 KaTeX 公式 $...$ 或 $$...$$"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label id="labelCallout">提示</label>
+                        <textarea id="itemCallout" placeholder="总结、避坑指南等……"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-cancel" onclick="closeModal()">取消</button>
+                        <button type="submit" class="btn-submit" id="submitBtn">✅ 添加</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ============================================================
+             统计看板模态框
+             ============================================================ -->
+        <div class="modal-overlay" id="statsOverlay">
+            <div class="modal modal-wide">
+                <div class="modal-header">
+                    <h2>📊 学习统计</h2>
+                    <button class="modal-close" onclick="closeStats()">&times;</button>
+                </div>
+                <div class="stats-body" id="statsBody"></div>
+            </div>
+        </div>
+
+        <!-- Toast 提示 -->
+        <div class="toast" id="toast"></div>
+    </main>
+
+    <script src="js/main.js?v=1.0"></script>
+</body>
+</html>
